@@ -29,6 +29,7 @@ composer_to_feature_token:
   composer20: 2071
   composer21: 2072
 t5:
+  model_name: t5-small
   feed_forward_proj: gated-gelu
   tie_word_embeddings: false
   tie_encoder_decoder: false
@@ -59,3 +60,6 @@ training:
   batch_size: 32
   num_workers: 32
   gradient_clip_val: 3.0
+inference:
+  batch_size: 16
+  precision: 16
