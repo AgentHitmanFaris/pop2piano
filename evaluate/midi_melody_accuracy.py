@@ -4,21 +4,26 @@ import pretty_midi
 import mir_eval.melody
 
 
-def get_highest_pitches_from_piano_roll(pr):
+def get_highest_pitches_from_piano_roll(pr, velocity_threshold=10):
     """
     params:
-        pr : (128, time(frame))
+        pr : (128, time(frame)) - contains velocity values
+        velocity_threshold : int - minimum velocity to consider as a valid note
 
     return:
         highest_pitches : (time(frame), )
     """
     highest_pitches = []
     for i in range(pr.shape[1]):
-        ps = np.nonzero(pr[:, i])
-        if len(ps[0]) == 0:
+        # Filter notes with velocity below threshold (assumed to be noise/ghost notes)
+        notes = pr[:, i]
+        valid_indices = np.where(notes >= velocity_threshold)[0]
+
+        if len(valid_indices) == 0:
             highest_pitches.append(np.nan)
         else:
-            highest_pitches.append(ps[0][-1])
+            # Skyline approach: Pick the highest pitch among valid notes
+            highest_pitches.append(valid_indices[-1])
     highest_pitches = np.array(highest_pitches)
 
     return highest_pitches

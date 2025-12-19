@@ -25,9 +25,12 @@ class TransformerWrapper(pl.LightningModule):
         self.config = config
 
         self.tokenizer = MidiTokenizer(config.tokenizer)
-        self.t5config = T5Config.from_pretrained("t5-small")
+        model_name = config.t5.get("model_name", "t5-small")
+        self.t5config = T5Config.from_pretrained(model_name)
 
         for k, v in config.t5.items():
+            if k == "model_name":
+                continue
             self.t5config.__setattr__(k, v)
 
         self.transformer = T5ForConditionalGeneration(self.t5config)
@@ -188,6 +191,15 @@ class TransformerWrapper(pl.LightningModule):
         batch = pad_and_stack_batch(batch)
 
         inputs_embeds = self.spectrogram(batch).transpose(-1, -2)
+
+        # Cast inputs_embeds to match transformer dtype if necessary (e.g. half precision)
+        # Spectrogram output is float32 because LogMelSpectrogram disables autocast
+        if hasattr(self.transformer, "dtype") and self.transformer.dtype != inputs_embeds.dtype:
+            inputs_embeds = inputs_embeds.to(self.transformer.dtype)
+        elif hasattr(self.transformer.shared.weight, "dtype") and self.transformer.shared.weight.dtype != inputs_embeds.dtype:
+            # Fallback check if model.dtype is not set correctly (e.g. older pytorch/transformers)
+            inputs_embeds = inputs_embeds.to(self.transformer.shared.weight.dtype)
+
         if self.mel_is_conditioned:
             composer_value = torch.tensor(composer_value).to(self.device)
             composer_value = composer_value.repeat(inputs_embeds.shape[0])

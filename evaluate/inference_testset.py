@@ -26,7 +26,24 @@ def inference_main(meta_files, ckpt, config, id, **kwargs):
     config = OmegaConf.load(config)
     wrapper = TransformerWrapper(config)
     wrapper = wrapper.load_from_checkpoint(ckpt, config=config).cuda()
+
+    # Optimization: Inference Precision
+    inference_precision = 32
+    if hasattr(config, "inference") and hasattr(config.inference, "precision"):
+        inference_precision = config.inference.precision
+
+    if inference_precision == 16:
+        wrapper.transformer.half()
+        if hasattr(wrapper, "mel_conditioner") and wrapper.mel_conditioner is not None:
+            wrapper.mel_conditioner.half()
+        # Note: wrapper.spectrogram should remain float32
+
     wrapper.eval()
+
+    # Optimization: Inference Batch Size
+    max_batch_size = 64 # Default fallback
+    if hasattr(config, "inference") and hasattr(config.inference, "batch_size"):
+        max_batch_size = config.inference.batch_size
 
     with torch.no_grad():
         for meta_file in tqdm(meta_files):
@@ -80,6 +97,7 @@ def inference_main(meta_files, ckpt, config, id, **kwargs):
                     beatsteps=beatstep - beatstep[0],
                     audio_y=y,
                     audio_sr=sr,
+                    max_batch_size=max_batch_size,
                 )
 
 
